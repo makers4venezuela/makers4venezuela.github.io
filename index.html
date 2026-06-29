@@ -144,6 +144,23 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;f
 footer a{color:var(--orange-dark);font-weight:700;text-decoration:none}
 .spin{display:inline-block;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
 .center{text-align:center;padding:40px 16px;color:var(--muted)}
+
+/* graphic dashboard cards (model breakdown with icons) */
+.dcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:14px}
+.dcard{background:var(--paper);border:2px solid var(--line);border-radius:14px;overflow:hidden}
+.dcard.nuevo{border-color:var(--green)}
+.dcard-img{height:100px;background:var(--paper-warm);display:flex;align-items:center;justify-content:center;padding:8px;position:relative}
+.dcard-img img{max-width:100%;max-height:100%;object-fit:contain}
+.dcard-img .noimg{font-size:34px;color:#cfc7b3}
+.dcard-badge{position:absolute;top:6px;left:6px;background:var(--green);color:#fff;font-size:7px;font-weight:900;padding:2px 6px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
+.dcard-b{padding:9px 11px 12px}
+.dcard-name{font-size:12px;font-weight:800;line-height:1.2;min-height:29px}
+.dcard-sub{font-size:10px;color:var(--orange-dark);font-weight:700;margin-top:1px}
+.dcard-n{font-size:27px;font-weight:900;color:var(--orange);line-height:1;margin-top:7px}
+.dcard-l{font-size:8px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.dcard-ent{font-size:9px;color:var(--green);font-weight:800;margin-top:3px}
+.dcard-bar{height:4px;background:var(--card);border-radius:2px;margin-top:7px;overflow:hidden}
+.dcard-bar i{display:block;height:100%;background:var(--orange);border-radius:2px;transition:width .5s}
 </style>
 </head>
 <body>
@@ -569,16 +586,23 @@ function renderDash(){
     const c=r.pais||""; if(c){ (byCountry[c]=byCountry[c]||{fab:0,ent:0}); byCountry[c].fab+=r.fab; byCountry[c].ent+=r.ent; } });
   const sorted=Object.entries(byModel).sort((a,b)=>b[1].fab-a[1].fab);
   const max=Math.max(1,...sorted.map(([,v])=>v.fab));
+  // image lookup by "Nombre - Variante" or "Nombre"
+  const imgMap={}; C.IDS.forEach((id,i)=>{ imgMap[modelLabel(i)]=C.IMGS[id]; imgMap[C.NAMES[i]]=imgMap[C.NAMES[i]]||C.IMGS[id]; });
   const modelRows=sorted.map(([t,v])=>{
     const isNew=/^NUEVO:/i.test(t); const label=t.replace(/^NUEVO:\s*/i,"");
     const [nm,sub]=label.split(" - ");
+    const img=imgMap[label]||imgMap[nm]||"";
     const pct=Math.round(v.fab/max*100);
-    return `<div class="drow">
-      <div class="drow-top">
-        <div><div class="drow-name">${esc(nm)}${isNew?' <span class="chip" style="padding:1px 7px;font-size:9px;border-color:var(--green);color:var(--green)">nuevo</span>':""}</div>
-          ${sub?`<div class="drow-sub">${esc(sub)}</div>`:""}</div>
-        <div class="drow-nums"><div><b class="o">${v.fab}</b><span>fab</span></div><div><b class="g">${v.ent}</b><span>ent</span></div></div>
-      </div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    return `<div class="dcard${isNew?" nuevo":""}">
+      <div class="dcard-img">${isNew?'<div class="dcard-badge">✨ nuevo</div>':""}
+        ${img?`<img src="${img}" alt="" loading="lazy">`:'<div class="noimg">🦴</div>'}</div>
+      <div class="dcard-b">
+        <div class="dcard-name">${esc(nm)}</div>
+        ${sub?`<div class="dcard-sub">${esc(sub)}</div>`:""}
+        <div class="dcard-n">${v.fab}</div><div class="dcard-l">unidades fabricadas</div>
+        ${v.ent?`<div class="dcard-ent">📦 ${v.ent} entregadas</div>`:""}
+        <div class="dcard-bar"><i style="width:${pct}%"></i></div>
+      </div></div>`;
   }).join("");
   body.innerHTML=`
     <section class="block" style="border-top:0;padding-top:6px">
@@ -590,7 +614,8 @@ function renderDash(){
       </div>
     </section>
     ${buildCountryMap(byCountry)}
-    <section class="block"><h2><span class="tick"></span>Producción por modelo</h2>${modelRows}</section>
+    <section class="block"><h2><span class="tick"></span>Producción por modelo</h2>
+      <div class="dcards">${modelRows}</div></section>
     <section class="block"><h2><span class="tick"></span>Talleres participantes (${orgs.size})</h2>
       <div class="chips">${[...orgs].sort().map(o=>`<div class="chip">${esc(o)}</div>`).join("")}</div></section>`;
 }
