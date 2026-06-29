@@ -45,6 +45,12 @@ function getProfile() {
   catch { return {}; }
 }
 
+/* Change volunteer / log out: forget this device's identity so the next
+ * person gets a fresh maker (new uuid + empty profile). */
+function clearIdentity() {
+  try { localStorage.removeItem(LS_PROFILE); localStorage.removeItem(LS_MAKER); } catch (e) {}
+}
+
 /* ---------- OPTIONAL magic-link verification (Phase 2) ---------- */
 async function sendMagicLink(email) {
   return db.auth.signInWithOtp({
@@ -174,7 +180,7 @@ async function getMyInventory() {
 
 /* expose */
 window.M4V = {
-  saveProfile, getProfile, getDeviceMakerId, sendMagicLink,
+  saveProfile, getProfile, clearIdentity, getDeviceMakerId, sendMagicLink,
   listModels, registerProduction, addDestination, uploadPhoto,
   getDashboard, getRows, getMyInventory
 };
