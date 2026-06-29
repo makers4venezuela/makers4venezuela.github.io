@@ -82,6 +82,15 @@ async function uploadPhoto(file) {
  *          notas, status, photoFile, destinationId} */
 async function registerProduction(entry) {
   const maker_id = getDeviceMakerId();
+  // Self-heal: make sure this device's maker row exists before inserting the
+  // event (covers devices identified before makers writes were allowed).
+  const p = getProfile();
+  if (p && p.name) {
+    await db.from("makers").upsert({
+      id: maker_id, name: p.name, org: p.org || null, country: p.country || null,
+      city: p.city || null, phone: p.phone || null, email: p.email || null
+    }, { onConflict: "id" });
+  }
   let photo_url = null;
   if (entry.photoFile) photo_url = await uploadPhoto(entry.photoFile);
 
