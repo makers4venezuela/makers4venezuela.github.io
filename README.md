@@ -4,7 +4,8 @@ Registro abierto de producción 3D para la donación médica en Venezuela.
 Los makers anotan cuántas férulas fabrican y entregan; el panel público suma
 el esfuerzo de toda la red en tiempo real.
 
-**Un proyecto de Fab City · [Things That Work](https://ttw.fab.city/venezuela).**
+**Un proyecto Iniciado por KAFETIN · [KAFETIN](https://kafetin.co/).**
+**Apoyado por · [Things That Work](https://ttw.fab.city/venezuela).**
 Backend (datos) operado por Fab City; front-end mantenido por Sebas.
 
 ---
