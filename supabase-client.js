@@ -29,14 +29,25 @@ function getDeviceMakerId() {
 /* Create/refresh this maker's profile row. Call on login screen submit.
  * profile = {name, org, country, city, phone, email} */
 async function saveProfile(profile) {
-  const id = getDeviceMakerId();
+  let id = getDeviceMakerId();
   localStorage.setItem(LS_PROFILE, JSON.stringify(profile));
-  const { error } = await db.from("makers").upsert({
+  // Recognise a returning maker: if one with the same name+org already exists
+  // (e.g. imported history), adopt its id so new records merge with the old ones.
+  try {
+    let look = db.from("makers_lookup").select("id").eq("name", profile.name).limit(1);
+    look = profile.org ? look.eq("org", profile.org) : look.is("org", null);
+    const { data: found } = await look;
+    if (found && found.length) { id = found[0].id; localStorage.setItem(LS_MAKER, id); }
+  } catch (e) { /* lookup view not present yet — fall back to device id */ }
+  // Create the maker row with a PLAIN insert (only needs INSERT permission;
+  // upserts are rejected because they also require UPDATE). A duplicate key
+  // (23505) just means the maker already exists — that's fine.
+  const { error } = await db.from("makers").insert({
     id, name: profile.name, org: profile.org, country: profile.country,
     city: profile.city || null, phone: profile.phone || null,
     email: profile.email || null
-  }, { onConflict: "id" });
-  if (error) console.warn("saveProfile:", error.message);
+  });
+  if (error && error.code !== "23505") console.warn("saveProfile:", error.message);
   return id;
 }
 
@@ -86,10 +97,11 @@ async function registerProduction(entry) {
   // event (covers devices identified before makers writes were allowed).
   const p = getProfile();
   if (p && p.name) {
-    await db.from("makers").upsert({
+    const { error: me } = await db.from("makers").insert({
       id: maker_id, name: p.name, org: p.org || null, country: p.country || null,
       city: p.city || null, phone: p.phone || null, email: p.email || null
-    }, { onConflict: "id" });
+    });
+    if (me && me.code !== "23505") console.warn("ensureMaker:", me.message);
   }
   let photo_url = null;
   if (entry.photoFile) photo_url = await uploadPhoto(entry.photoFile);
