@@ -191,6 +191,33 @@ async function getRows() {
   }));
 }
 
+/* ---------- my track record ----------
+ * All events for this maker: the device's own maker id PLUS any maker rows that
+ * share the same company (org) — so imported history and re-identifications on
+ * other devices show up together. Needs the maker_events + makers_lookup views. */
+async function getMyEvents() {
+  const p = getProfile();
+  const ids = new Set([getDeviceMakerId()]);
+  try {
+    if (p && p.org) {
+      const { data } = await db.from("makers_lookup").select("id").eq("org", p.org);
+      (data || []).forEach(r => ids.add(r.id));
+    }
+  } catch (e) { /* lookup view not present */ }
+  let rows = [];
+  try {
+    const { data, error } = await db.from("maker_events").select("*")
+      .in("maker_id", [...ids]).order("event_date", { ascending: false });
+    if (!error && data) rows = data;
+  } catch (e) { /* maker_events view not present */ }
+  return rows.map(r => ({
+    maker_id: r.maker_id, fecha: r.event_date || "", empresa: r.org || "",
+    tipo: (r.model_name || "") + (r.variant ? " - " + r.variant : ""),
+    fab: r.qty_fabricated || 0, ent: r.qty_delivered || 0,
+    status: r.status, notas: r.notes || ""
+  }));
+}
+
 /* ---------- my inventory (TTW layer; needs verified login) ---------- */
 async function getMyInventory() {
   const { data, error } = await db.from("inventory")
@@ -203,5 +230,5 @@ async function getMyInventory() {
 window.M4V = {
   saveProfile, getProfile, clearIdentity, getDeviceMakerId, sendMagicLink,
   listModels, registerProduction, addDestination, uploadPhoto,
-  getDashboard, getRows, getMyInventory
+  getDashboard, getRows, getMyEvents, getMyInventory
 };

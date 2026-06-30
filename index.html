@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#E2580E">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="description" content="Registro abierto de producción 3D para la donación médica en Venezuela. Creado por KAFETIN, con el apoyo de Fab City · Things That Work.">
+<meta name="description" content="Registro abierto de producción 3D para la donación médica en Venezuela. Creado por KAFETIN, con la tecnología de Fab City · Things That Work.">
 <meta property="og:title" content="Makers · Venezuela — Registro de producción">
 <meta property="og:description" content="Cuántas férulas se están imprimiendo y entregando. Registra lo que haces, mira el panel, aporta tu historial.">
 <meta property="og:url" content="https://ttw.fab.city/venezuela">
@@ -174,6 +174,7 @@ footer a{color:var(--orange-dark);font-weight:700;text-decoration:none}
       <a data-route="registro">Registrar</a>
       <a data-route="dashboard">Panel</a>
       <a data-route="ingesta">Aportar</a>
+      <a id="nav-mine" data-route="mis-registros" style="display:none">Mi panel</a>
       <a id="nav-logout" data-action="logout" style="display:none;color:var(--red)">⎋ Salir</a>
       <a class="ttw" href="https://ttw.fab.city/venezuela" target="_blank" rel="noopener">TTW ↗</a>
     </nav>
@@ -184,7 +185,7 @@ footer a{color:var(--orange-dark);font-weight:700;text-decoration:none}
 
 <footer><div class="wrap">
   <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;width:100%">
-    <span>Creado por <a href="https://www.kafetin.co" target="_blank" rel="noopener"><strong>KAFETIN</strong></a> · con el apoyo de <strong>Fab City</strong></span>
+    <span>Creado por <a href="https://www.kafetin.co" target="_blank" rel="noopener"><strong>KAFETIN</strong></a> · con la tecnología de <strong>Fab City</strong></span>
     <span style="display:flex;align-items:center;gap:14px">
       <a href="https://ttw.fab.city/venezuela" target="_blank" rel="noopener">ttw.fab.city/venezuela</a>
       <a href="https://github.com/makers4venezuela/makers4venezuela.github.io" target="_blank" rel="noopener"
@@ -209,14 +210,14 @@ footer a{color:var(--orange-dark);font-weight:700;text-decoration:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-client.js?v=3"></script>
-<script src="models-data.js?v=3"></script>
+<script src="supabase-client.js?v=4"></script>
+<script src="models-data.js?v=4"></script>
 <script>
 /* ============================================================
    Makers · Venezuela — TTW-skinned app with clean-path routing
    Routes: / (home) · /registro · /dashboard · /ingesta
    ============================================================ */
-const SECTIONS = ["registro","dashboard","ingesta"];
+const SECTIONS = ["registro","dashboard","ingesta","mis-registros"];
 const PAISES = ["Venezuela","Colombia","Argentina","Bolivia","Chile","Costa Rica","Cuba","Ecuador","El Salvador","España","Estados Unidos","Guatemala","Honduras","México","Nicaragua","Panamá","Paraguay","Perú","República Dominicana","Uruguay","Otro"];
 const C = window.CATALOG || {IDS:[],NAMES:[],SUBS:[],ALTAS:[],IMGS:{}};
 const app = document.getElementById("app");
@@ -266,8 +267,9 @@ function logout(){
 function setNav(route){
   document.querySelectorAll(".nav a[data-route]").forEach(a=>
     a.classList.toggle("on", a.dataset.route===route));
-  const lo=document.getElementById("nav-logout");
-  if(lo) lo.style.display = hasProfile() ? "" : "none";
+  const show = hasProfile() ? "" : "none";
+  const lo=document.getElementById("nav-logout"); if(lo) lo.style.display = show;
+  const mine=document.getElementById("nav-mine"); if(mine) mine.style.display = show;
 }
 
 /* ---- helpers ---- */
@@ -756,6 +758,65 @@ function renderDash(){
 }
 
 /* ============================================================
+   VIEW: MI PANEL (track record for the current maker + duplicate flags)
+   ============================================================ */
+async function viewMisRegistros(){
+  if(!hasProfile()) return viewIdentity("mis-registros");
+  const p=M4V.getProfile();
+  app.innerHTML=`
+  <section class="block">
+    <div class="kicker">Mi panel · ${esc(p.org||p.name||"")}</div>
+    <h1>Mi registro</h1>
+    <p class="lead">Todo lo que has registrado, agrupado por tu taller${p.org?` (${esc(p.org)})`:""}.
+      Marcamos posibles duplicados para que los revises.</p>
+    <div class="btn-row"><button class="btn ghost" onclick="downloadAll()" style="font-size:13px;padding:9px 14px">⬇ Descargar reporte</button></div>
+    <div id="mine-body"><div class="center"><span class="spin">⏳</span> Cargando…</div></div>
+  </section>`;
+  let rows=[]; try{ rows=await M4V.getMyEvents(); }catch(e){}
+  renderMine(rows);
+}
+function renderMine(rows){
+  const body=document.getElementById("mine-body"); if(!body) return;
+  if(!rows||!rows.length){
+    body.innerHTML=`<div class="center">Aún no hay registros a tu nombre.<br>
+      Si configuraste la base hace poco, ejecuta <code>migrate/user-panel.sql</code> en Supabase.</div>`; return;
+  }
+  let fab=0,ent=0; const seen={};
+  rows.forEach(r=>{ fab+=r.fab; ent+=r.ent;
+    const k=[r.tipo,(r.fecha||"").slice(0,10),r.fab,r.ent].join("|"); seen[k]=(seen[k]||0)+1; });
+  const dupGroups=Object.values(seen).filter(n=>n>1).length;
+  const tbl=rows.map(r=>{
+    const k=[r.tipo,(r.fecha||"").slice(0,10),r.fab,r.ent].join("|");
+    const dup=seen[k]>1;
+    const [nm,sub]=(r.tipo||"").replace(/^NUEVO:\s*/i,"").split(" - ");
+    return `<tr style="${dup?"background:#fff3e6;":""}border-bottom:1px solid var(--line)">
+      <td style="padding:7px 5px;white-space:nowrap">${esc((r.fecha||"").slice(0,10))}</td>
+      <td style="padding:7px 5px">${esc(nm||r.tipo)}${sub?` · <span style="color:var(--orange-dark)">${esc(sub)}</span>`:""}${dup?' <span title="Posible duplicado" style="color:var(--orange);font-weight:900">⚠︎</span>':""}</td>
+      <td style="padding:7px 5px;text-align:right;font-weight:800">${r.fab}</td>
+      <td style="padding:7px 5px;text-align:right;font-weight:800;color:var(--green)">${r.ent}</td></tr>`;
+  }).join("");
+  const dupNote = dupGroups
+    ? `<div style="background:var(--card);border:1.5px solid var(--orange);border-radius:10px;padding:10px 13px;margin-top:12px;font-size:13px;line-height:1.5">
+         ⚠︎ Detectamos <b>${dupGroups}</b> posible(s) duplicado(s) — mismo modelo, fecha y cantidades.
+         Revisa las filas resaltadas; si registraste algo dos veces, anótalo para no contarlo doble.</div>`
+    : `<div style="color:var(--green);font-size:12px;font-weight:700;margin-top:12px">✓ Sin duplicados detectados.</div>`;
+  body.innerHTML=`
+    <div class="kpis">
+      <div class="kpi o"><b>${fab.toLocaleString("es")}</b><span>🔧 Fabricadas</span></div>
+      <div class="kpi g"><b>${ent.toLocaleString("es")}</b><span>📦 Entregadas</span></div>
+      <div class="kpi"><b>${rows.length}</b><span>📋 Registros</span></div>
+    </div>
+    ${dupNote}
+    <div style="overflow-x:auto;margin-top:14px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--line)">
+        <th style="padding:6px 5px">Fecha</th><th style="padding:6px 5px">Modelo</th>
+        <th style="padding:6px 5px;text-align:right">Fab</th><th style="padding:6px 5px;text-align:right">Ent</th></tr></thead>
+      <tbody>${tbl}</tbody>
+    </table></div>`;
+}
+
+/* ============================================================
    ROUTER DISPATCH
    ============================================================ */
 function render(route){
@@ -764,6 +825,7 @@ function render(route){
   if(route==="registro") return viewRegistro();
   if(route==="dashboard") return viewDashboard();
   if(route==="ingesta") return viewIngesta();
+  if(route==="mis-registros") return viewMisRegistros();
   return viewHome();
 }
 // Restore a deep-link route preserved by 404.html (GitHub Pages SPA fallback)
