@@ -4,7 +4,7 @@ Registro abierto de producción 3D para la donación médica en Venezuela.
 Los makers anotan cuántas férulas fabrican y entregan; el panel público suma
 el esfuerzo de toda la red en tiempo real.
 
-**Creado por [KAFETIN](https://www.kafetin.co) · con la tecnología de Fab City**
+**Creado por [KAFETIN](https://www.kafetin.co) · con el apoyo de Fab City**
 · [Things That Work](https://ttw.fab.city/venezuela)
 
 > **Datos:** Fab City es una organización sin ánimo de lucro con sede en Estonia.
